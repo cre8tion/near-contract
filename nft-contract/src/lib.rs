@@ -46,6 +46,8 @@ pub struct Contract {
 
     //keeps track of the metadata for the contract
     pub metadata: LazyOption<NFTContractMetadata>,
+
+    pub current_token_id: u32,
 }
 
 /// Helper structure for keys of the persistent collections.
@@ -106,6 +108,7 @@ impl Contract {
                 StorageKey::NFTContractMetadata.try_to_vec().unwrap(),
                 Some(&metadata),
             ),
+            current_token_id: u32::MIN,
         };
 
         //return the Contract object
