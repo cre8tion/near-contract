@@ -1,0 +1,1 @@
+near create-account nft-example.$1 --masterAccount $1 --initialBalance 10
