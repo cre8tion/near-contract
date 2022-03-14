@@ -80,7 +80,7 @@ impl Contract {
                 name: "NFT Tutorial Contract".to_string(),
                 symbol: "GOTEAM".to_string(),
                 icon: None,
-                base_uri: None,
+                base_uri: "https://ipfs.fleek.co/ipfs".to_string(),
                 reference: None,
                 reference_hash: None,
             },
