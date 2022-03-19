@@ -7,30 +7,44 @@ impl Contract {
         &mut self,
         receiver_id: AccountId,
         //we add an optional parameter for perpetual royalties
-        perpetual_royalties: Option<HashMap<AccountId, u32>>,
+        //perpetual_royalties: Option<HashMap<AccountId, u32>>,
     ) {
         //measure the initial storage being used on the contract
         let initial_storage_usage = env::storage_usage();
 
         // create a royalty map to store in the token
-        let mut royalty = HashMap::new();
+        //let mut royalty = HashMap::new();
+        let royalty = HashMap::new();
 
-        // if perpetual royalties were passed into the function: 
+        // if perpetual royalties were passed into the function:
+        /*
         if let Some(perpetual_royalties) = perpetual_royalties {
             //make sure that the length of the perpetual royalties is below 7 since we won't have enough GAS to pay out that many people
-            assert!(perpetual_royalties.len() < 7, "Cannot add more than 6 perpetual royalty amounts");
+            assert!(
+                perpetual_royalties.len() < 7,
+                "Cannot add more than 6 perpetual royalty amounts"
+            );
 
             //iterate through the perpetual royalties and insert the account and amount in the royalty map
             for (account, amount) in perpetual_royalties {
                 royalty.insert(account, amount);
             }
         }
+        */
 
         // current_token_id starts with 0
-        assert!((self.current_token_id as u128) < self.nft_total_supply().into(), "No more NFTs can be minted");
-        assert!(self.token_metadata_by_id.get(&self.current_token_id.to_string()).is_some(), "Metadata is not initialised");
+        assert!(
+            (self.current_token_id as u128) < self.nft_total_supply().into(),
+            "No more NFTs can be minted"
+        );
+        assert!(
+            self.token_metadata_by_id
+                .get(&self.current_token_id.to_string())
+                .is_some(),
+            "Metadata is not initialised"
+        );
 
-        //specify the token struct that contains the owner ID 
+        //specify the token struct that contains the owner ID
         let token = Token {
             //set the owner ID equal to the receiver ID passed into the function
             owner_id: receiver_id,
@@ -44,7 +58,9 @@ impl Contract {
 
         //insert the token ID and token struct and make sure that the token doesn't exist
         assert!(
-            self.tokens_by_id.insert(&self.current_token_id.to_string(), &token).is_none(),
+            self.tokens_by_id
+                .insert(&self.current_token_id.to_string(), &token)
+                .is_none(),
             "Token already exists"
         );
 
@@ -73,12 +89,13 @@ impl Contract {
 
         // Log the serialized json.
         env::log_str(&nft_mint_log.to_string());
+        env::log_str(&self.mint_price.to_string());
 
         //calculate the required storage which was the used - initial
         let required_storage_in_bytes = env::storage_usage() - initial_storage_usage;
 
         //refund any excess storage if the user attached too much. Panic if they didn't attach enough to cover the required.
-        refund_deposit(required_storage_in_bytes);
+        refund_deposit_mint(required_storage_in_bytes, &self.mint_price);
 
         self.current_token_id = &self.current_token_id + 1;
 
@@ -86,16 +103,16 @@ impl Contract {
     }
 }
 
-
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
+    use crate::nft_core::NonFungibleTokenCore;
     use near_sdk::test_utils::{accounts, VMContextBuilder};
     use near_sdk::testing_env;
 
     use super::*;
     use std::collections::HashMap;
-    
-    const MINT_STORAGE_COST: u128 = 5870000000000000000000;
+    const INSUFFICIENT_MINT_STORAGE_COST: u128 = 5870000000000000000000;
+    const MINT_STORAGE_COST: u128 = 1005000000000000000000000;
 
     fn get_context(predecessor_account_id: AccountId) -> VMContextBuilder {
         let mut builder = VMContextBuilder::new();
@@ -136,9 +153,43 @@ mod tests {
             .predecessor_account_id(accounts(1))
             .build());
 
-        contract.nft_mint(accounts(1), None);
+        contract.nft_mint(accounts(1));
     }
-    
+
+    #[test]
+    #[should_panic(
+        expected = "Must attach 1003750000000000000000000 yoctoNEAR to cover storage and minting cost"
+    )]
+    fn test_mint_error() {
+        let mut context = get_context(accounts(0));
+        testing_env!(context.build());
+        let mut contract = Contract::new_default_meta(accounts(0).into());
+
+        let token_id = "0".to_string();
+        let metadata_result =
+            contract.set_token_metadata(token_id.clone(), sample_token_metadata());
+        assert_eq!(metadata_result, true);
+
+        testing_env!(context
+            .storage_usage(env::storage_usage())
+            .attached_deposit(INSUFFICIENT_MINT_STORAGE_COST)
+            .predecessor_account_id(accounts(1))
+            .build());
+
+        contract.nft_mint(accounts(1));
+        assert_eq!(contract.nft_tokens(None, None).len(), 1);
+
+        if let Some(token) = contract.nft_token(token_id.clone()) {
+            assert_eq!(token.token_id, token_id);
+            assert_eq!(token.owner_id, accounts(1));
+            assert_eq!(token.metadata, sample_token_metadata());
+            assert_eq!(token.approved_account_ids, HashMap::new());
+            assert_eq!(token.royalty, HashMap::new());
+        } else {
+            panic!("token not correctly created, or not found by nft_token");
+        }
+    }
+
     #[test]
     fn test_mint() {
         let mut context = get_context(accounts(0));
@@ -146,7 +197,8 @@ mod tests {
         let mut contract = Contract::new_default_meta(accounts(0).into());
 
         let token_id = "0".to_string();
-        let metadata_result = contract.set_token_metadata(token_id.clone(), sample_token_metadata());
+        let metadata_result =
+            contract.set_token_metadata(token_id.clone(), sample_token_metadata());
         assert_eq!(metadata_result, true);
 
         testing_env!(context
@@ -155,8 +207,7 @@ mod tests {
             .predecessor_account_id(accounts(1))
             .build());
 
-        contract.nft_mint(accounts(1), None);
-        
+        contract.nft_mint(accounts(1));
         assert_eq!(contract.nft_tokens(None, None).len(), 1);
 
         if let Some(token) = contract.nft_token(token_id.clone()) {

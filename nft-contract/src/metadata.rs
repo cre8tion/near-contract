@@ -5,7 +5,7 @@ pub type TokenId = String;
 #[serde(crate = "near_sdk::serde")]
 pub struct Payout {
     pub payout: HashMap<AccountId, U128>,
-} 
+}
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone)]
 #[serde(crate = "near_sdk::serde")]
@@ -42,13 +42,13 @@ pub struct Token {
     pub owner_id: AccountId,
     //list of approved account IDs that have access to transfer the token. This maps an account ID to an approval ID
     pub approved_account_ids: HashMap<AccountId, u64>,
-    //the next approval ID to give out. 
+    //the next approval ID to give out.
     pub next_approval_id: u64,
     //keep track of the royalty percentages for the token in a hash map
     pub royalty: HashMap<AccountId, u32>,
 }
 
-//The Json token is what will be returned from view calls. 
+//The Json token is what will be returned from view calls.
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(crate = "near_sdk::serde")]
 pub struct JsonToken {
@@ -78,46 +78,54 @@ impl NonFungibleTokenMetadata for Contract {
 
 #[near_bindgen]
 impl Contract {
-
     #[payable]
-    pub fn set_token_metadata(
-        &mut self,
-        token_id: TokenId,
-        metadata: TokenMetadata
-    ) -> bool {
-        assert_eq!(env::predecessor_account_id(), self.owner_id, "Unauthorized user to set token metadata");
-        assert!(self.token_metadata_by_id.insert(&token_id, &metadata).is_none(), "Cannot add metadata to existing token id");
-        
-        return true
+    pub fn set_token_metadata(&mut self, token_id: TokenId, metadata: TokenMetadata) -> bool {
+        assert_eq!(
+            env::predecessor_account_id(),
+            self.owner_id,
+            "Unauthorized user to set token metadata"
+        );
+        assert!(
+            self.token_metadata_by_id
+                .insert(&token_id, &metadata)
+                .is_none(),
+            "Cannot add metadata to existing token id"
+        );
+
+        return true;
     }
 
     #[payable]
-    pub fn update_token_metadata(
-        &mut self,
-        token_id: TokenId,
-        metadata: TokenMetadata
-    ) -> bool {
-        assert_eq!(env::predecessor_account_id(), self.owner_id, "Unauthorized user to update token metadata");
-        assert!(self.token_metadata_by_id.insert(&token_id, &metadata).is_some(), "Add metadata to token id first");
+    pub fn update_token_metadata(&mut self, token_id: TokenId, metadata: TokenMetadata) -> bool {
+        assert_eq!(
+            env::predecessor_account_id(),
+            self.owner_id,
+            "Unauthorized user to update token metadata"
+        );
+        assert!(
+            self.token_metadata_by_id
+                .insert(&token_id, &metadata)
+                .is_some(),
+            "Add metadata to token id first"
+        );
 
-        return true
+        return true;
     }
 
-    pub fn nft_token_metadata(
-        &self,
-        token_id: TokenId
-    ) -> Option<TokenMetadata> {
+    pub fn nft_token_metadata(&self, token_id: TokenId) -> Option<TokenMetadata> {
         if let Some(metadata) = self.token_metadata_by_id.get(&token_id) {
             //we return the JsonToken (wrapped by Some since we return an option)
             Some(metadata)
-        } else { //if there wasn't a token ID in the tokens_by_id collection, we return None
+        } else {
+            //if there wasn't a token ID in the tokens_by_id collection, we return None
             None
         }
-    }    
+    }
 }
 
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
+    use crate::nft_core::NonFungibleTokenCore;
     use near_sdk::test_utils::{accounts, VMContextBuilder};
     use near_sdk::testing_env;
 
@@ -205,9 +213,9 @@ mod tests {
         let mut context = get_context(accounts(0));
         testing_env!(context.build());
         let mut contract = Contract::new_default_meta(accounts(0).into());
-        
         let token_id = "0".to_string();
-        let metadata_result = contract.set_token_metadata(token_id.clone(), sample_token_metadata());
+        let metadata_result =
+            contract.set_token_metadata(token_id.clone(), sample_token_metadata());
         assert_eq!(metadata_result, true);
 
         testing_env!(context
@@ -230,13 +238,11 @@ mod tests {
         let mut context = get_context(accounts(0));
         testing_env!(context.build());
         let mut contract = Contract::new_default_meta(accounts(0).into());
-                
         testing_env!(context
             .storage_usage(env::storage_usage())
             .attached_deposit(1)
             .predecessor_account_id(accounts(1))
             .build());
-        
         let token_id = "0".to_string();
         contract.set_token_metadata(token_id.clone(), sample_token_metadata());
     }
@@ -246,9 +252,9 @@ mod tests {
         let mut context = get_context(accounts(0));
         testing_env!(context.build());
         let mut contract = Contract::new_default_meta(accounts(0).into());
-        
         let token_id = "0".to_string();
-        let metadata_result = contract.set_token_metadata(token_id.clone(), sample_token_metadata());
+        let metadata_result =
+            contract.set_token_metadata(token_id.clone(), sample_token_metadata());
         assert_eq!(metadata_result, true);
 
         testing_env!(context
@@ -271,7 +277,8 @@ mod tests {
             .is_view(false)
             .build());
 
-        let update_metadata_result = contract.update_token_metadata(token_id.clone(), sample_token_metadata_2());
+        let update_metadata_result =
+            contract.update_token_metadata(token_id.clone(), sample_token_metadata_2());
         assert_eq!(update_metadata_result, true);
 
         testing_env!(context
@@ -294,13 +301,11 @@ mod tests {
         let mut context = get_context(accounts(0));
         testing_env!(context.build());
         let mut contract = Contract::new_default_meta(accounts(0).into());
-                
         testing_env!(context
             .storage_usage(env::storage_usage())
             .attached_deposit(1)
             .predecessor_account_id(accounts(0))
             .build());
-        
         let token_id = "0".to_string();
         contract.update_token_metadata(token_id.clone(), sample_token_metadata());
     }
